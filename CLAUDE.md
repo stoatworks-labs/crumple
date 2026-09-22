@@ -1,0 +1,62 @@
+# crumple
+
+Crumpled paper for Resolume Arena/Avenue, as an FFGL effect. The clip is
+printed on a sheet that is crumpled and smoothed out under a lamp. Paper bends
+but does not stretch, so the print is pulled in where the sheet tilts and kinks
+at every crease. C++/GLSL, CMake MODULE → universal `.bundle` (macOS) +
+Windows `.dll`. MIT. ID `CR01`, display name `SW Crumple`. Sibling of
+`~/dev/millpond`, whose FFT it reuses.
+
+Read `AGENTS.md` before touching the sheet model, the solve or the dirty
+tracking.
+
+## Commands (CMake)
+- Configure: `cmake -B build -DCMAKE_BUILD_TYPE=Release` (fast dev build: add `-DCMAKE_OSX_ARCHITECTURES=arm64`)
+- Build: `cmake --build build`; install to Resolume: `cmake --install build`
+- Render offline: `./build/crtest --out /tmp/frame.png --set "Crumple=0.6"`
+- List parameters: `./build/crtest --list`
+- Film: `./build/crtest --film 600 --size 1280x720 --script docs/demo.cues | ffmpeg -f rawvideo -pix_fmt rgba -s 1280x720 -r 60 -i - out.mp4`
+
+## Verify
+- Everything: `tools/verify.sh` (~15 s)
+- `--flat` (identity at Crumple 0), `--isometry` (½s² pull across a ridge, all
+  Details, and the composite reads x − u), `--lambert`, `--shadow` (H/tan e),
+  `--monotone` (the sheet only rises; the facets tile the frame), `--negative`
+  (5 wrong models, all must fail), `--bench` (still and moving).
+- `python3 tools/sweep.py`: 20 live; Audio Scrunch needs `--beat`.
+
+## Notes
+- **The sheet is a sum of piecewise-planar layers.** Each layer is a Delaunay
+  triangulation (Bowyer–Watson, `Sheet.cpp`) of stratified junctions with
+  random heights. Facets are drawn as triangles with ADDITIVE blending, so the
+  layers sum per pixel. The triangulation is cached in `layers` until the
+  seed, scale, layer count or aspect changes.
+- **Crease marks are measured before Flatten**, so a smoothed sheet keeps them.
+- **The stretch is least squares per mode:** û = (2/|k|²)(r − k(k·r)/2|k|²),
+  r = iÂk, on the frame mirrored to 2W × 2H (the edges are pinned). Reuses
+  millpond's Stockham FFT and double-precision twiddles.
+- **The strain comes from a COARSE drawing of the sheet** (four samples a grid
+  cell, `coarse`), mipmapped. The picture-sized strain was most of a moving
+  sheet's cost at 4K.
+- **Dirty tracking:** when nothing that shapes the sheet changed, the frame is
+  the composite alone. Anything new that affects the sheet must be added to
+  the `dirty` test in `ProcessOpenGL`.
+- **Shadow steps** come from `ShadowSteps()`, which the harness also uses for
+  its tolerance.
+- `flat` is a GLSL reserved word and `round` a built-in: the first draft used
+  both. `verify.sh` greps for the reserved ones.
+- All host parameters are 0..1 and mapped in `Controls.cpp`; option parameters
+  hold the element value.
+- Override `SetTextParameter` for the About block, or no host can instantiate it.
+- `crumple_core` is an OBJECT library. The macOS build must be universal:
+  check with `lipo`.
+- Local repo only: no remote, no tag, not registered on the website.
+
+## Not done yet
+- Never loaded into Resolume (oxbow selftest only). No OFX, browser demo or
+  presets. Never built on Windows.
+- `StoatworksAbout.h` and `ATTRIBUTIONS.md` are provisional hand copies.
+
+## Diagnostics
+`~/Library/Logs/crumple/crumple.YYYY-MM-DD.log`: which shader failed, and the
+GL strings.

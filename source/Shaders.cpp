@@ -140,8 +140,8 @@ void main()
 // output j takes its even half from j's own sub-transform and its odd half
 // from the one Length/2 further on, twiddled by exp( +-2 pi i (j mod Span) /
 // Span ). Millpond's, unchanged: written out for N = 4 in millpond's
-// AGENTS.md and checked there against a double-precision DFT; `crtest --fft`
-// re-checks this copy.
+// AGENTS.md and checked there against a double-precision DFT. Here
+// `crtest --isometry` exercises it end to end.
 //---------------------------------------------------------------------------
 const char* const kFFTShader = R"(#version 410 core
 
