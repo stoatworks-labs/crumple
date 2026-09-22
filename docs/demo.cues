@@ -1,0 +1,12 @@
+# Crumple demo reel: 10 s at 60 fps.
+#     crtest --film 600 --size 1280x720 --script docs/demo.cues | ffmpeg ...
+# A flat page is crumpled -- big folds first, then smaller ones inside them --
+# held, smoothed back out (the crease marks stay), and the lamp swings round.
+0    Crumple         0
+0    Flatten         0
+240  Crumple         1
+300  Crumple         1
+300  Flatten         0
+420  Flatten         0.75
+420  Lamp Azimuth    0.375
+600  Lamp Azimuth    0.875
