@@ -24,6 +24,45 @@ lamp.
 photograph) at the plugin's defaults. Rendered by the plugin's offline harness
 (`crtest`), not captured from Resolume.</sub>
 
+[![Crumple — crumpled paper as an effect, for Resolume](docs/video-thumb.png)](https://www.youtube.com/watch?v=wWfb8NyeoY8)
+
+*[Watch it](https://www.youtube.com/watch?v=wWfb8NyeoY8) — 42 seconds: a print crumpled from flat, straight lines kinking at the creases, the
+lamp coming down and swinging round, and the sheet flattened with its crease marks
+left in. Every frame is the real plugin's output, rendered by its offline harness
+from Resolume's own demo clips rather than captured from Resolume.*
+
+<!-- downloads:start -->
+
+## Download
+
+**[v0.1.0](https://github.com/stoatworks-labs/crumple/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+
+<details>
+<summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`crumple-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/crumple/releases/download/v0.1.0/crumple-0.1.0-macos-universal.dmg) | 240 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`crumple-macos-universal.zip`](https://github.com/stoatworks-labs/crumple/releases/latest/download/crumple-macos-universal.zip) | 203 KB |
+
+</details>
+
+<details>
+<summary><b>Windows</b> — x64</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| x64 · .exe installer | [`crumple-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/crumple/releases/download/v0.1.0/crumple-0.1.0-windows-x86_64-setup.exe) | 229 KB |
+| x64 · .zip archive | [`crumple-windows-x86_64.zip`](https://github.com/stoatworks-labs/crumple/releases/latest/download/crumple-windows-x86_64.zip) | 124 KB |
+
+</details>
+
+All builds, checksums and release notes: [github.com/stoatworks-labs/crumple/releases](https://github.com/stoatworks-labs/crumple/releases).
+
+macOS builds are signed and notarised and open normally. The Windows builds are unsigned, so SmartScreen warns once.
+
+<!-- downloads:end -->
+
 ## The one idea
 
 **Paper bends but does not stretch.** Crumpled paper is facets and creases:
