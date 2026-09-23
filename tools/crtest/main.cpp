@@ -17,6 +17,7 @@
         --lambert     each facet of a known crease is lit by Lambert, exactly
         --shadow      a ridge of height H under a lamp at elevation e casts a
                       shadow H / tan e long
+        --state       the GL state the host hands over is the state it gets back
         --monotone    raising Crumple only ever raises the sheet, and the
                       facets are a true triangulation of the frame
         --negative    every check above, against a wrong model, must fail
@@ -91,6 +92,7 @@ struct Perturb
 	double shadowFactor = 1.0;  ///< --shadow expects this times H / tan e
 	double flatSlack    = 0.0;  ///< --flat adds this to the expected output
 	bool reseeded       = false;///< --monotone scores against another seed's sheet
+	bool expectShallowing = false;///< --monotone expects |h| to FALL as Crumple rises
 };
 
 //---------------------------------------------------------------------------
@@ -331,6 +333,29 @@ GLuint makeTexture( int width, int height, const float* pixels )
 	return texture;
 }
 
+/// The host's texture can be bigger than its picture (HardwareWidth > Width),
+/// with the picture in the corner and MaxUV saying how much of it is real.
+/// A padded copy of `picture`: magenta everywhere outside it.
+GLuint paddedTexture( const Floats& picture, int width, int height, int hw, int hh )
+{
+	Floats padded( static_cast< size_t >( hw ) * hh * 4 );
+	for( int y = 0; y < hh; ++y )
+		for( int x = 0; x < hw; ++x )
+		{
+			float* o = &padded[ ( static_cast< size_t >( y ) * hw + x ) * 4 ];
+			if( x < width && y < height )
+				std::memcpy( o, &picture[ ( static_cast< size_t >( y ) * width + x ) * 4 ], 4 * sizeof( float ) );
+			else
+			{
+				o[ 0 ] = 1.0f;
+				o[ 1 ] = 0.0f;
+				o[ 2 ] = 1.0f;
+				o[ 3 ] = 1.0f;
+			}
+		}
+	return makeTexture( hw, hh, padded.data() );
+}
+
 //---------------------------------------------------------------------------
 // The audio the harness feeds, as millpond's feeds it: written into
 // the Audio buffer's elements the way the host writes them.
@@ -493,6 +518,22 @@ double stretchAt( const Floats& field, int nx, int ny, double aspect, double x, 
 	       + ty * ( ( 1 - tx ) * at( i, j + 1 ) + tx * at( i + 1, j + 1 ) );
 }
 
+/// The same sheet turned on its side: x and y swapped. Swapping two axes
+/// mirrors, so two corners swap too, to keep every facet counter-clockwise.
+std::vector< Facet > transposed( std::vector< Facet > sheet )
+{
+	for( Facet& f : sheet )
+	{
+		for( int k = 0; k < 3; ++k )
+			std::swap( f.x[ k ], f.y[ k ] );
+		std::swap( f.x[ 1 ], f.x[ 2 ] );
+		std::swap( f.y[ 1 ], f.y[ 2 ] );
+		std::swap( f.z[ 1 ], f.z[ 2 ] );
+		std::swap( f.crease[ 1 ], f.crease[ 2 ] );
+	}
+	return sheet;
+}
+
 float paramFor( double value, double low, double high )
 {
 	return static_cast< float >( ( value - low ) / ( high - low ) );
@@ -521,6 +562,39 @@ int runFlat( const Perturb& perturb )
 		Check( worst < 1e-5, fmt( "%dx%d, every other control at its default: within %.1e of the picture (bound 1e-5)",
 		                          size.first, size.second, worst ) );
 	}
+	//A host texture bigger than its picture: 960x540 in the corner of a
+	//1024x1024 texture padded with magenta. Flat must still be the picture,
+	//and a crumpled sheet must never pull the padding in.
+	for( int crumpled = 0; crumpled < 2; ++crumpled )
+	{
+		const int w = 960, h = 540;
+		const Floats card = buildCard( w, h );
+		Rig rig;
+		if( !rig.Init( w, h, &card ) )
+			return 1;
+		rig.Set( PT_CRUMPLE, crumpled ? 1.0f : 0.0f );
+		rig.Set( PT_RELIEF, crumpled ? 1.0f : 0.35f );
+		const GLuint padded = paddedTexture( card, w, h, 1024, 1024 );
+		rig.inputStruct.Handle         = padded;
+		rig.inputStruct.HardwareWidth  = 1024;
+		rig.inputStruct.HardwareHeight = 1024;
+		rig.Render( 2 );
+		const Floats out = rig.Output();
+		double worst = 0.0;
+		int magenta  = 0;
+		for( size_t i = 0; i < out.size(); i += 4 )
+		{
+			for( int c = 0; c < 3; ++c )
+				worst = std::max( worst, static_cast< double >( std::fabs( out[ i + c ] - card[ i + c ] ) ) );
+			magenta += out[ i ] > 0.9f && out[ i + 1 ] < 0.25f && out[ i + 2 ] > 0.9f;
+		}
+		glDeleteTextures( 1, &padded );
+		if( crumpled )
+			Check( magenta == 0, fmt( "padded host texture, crumpled hard: %d pixels of the padding show", magenta ) );
+		else
+			Check( worst < 1e-5, fmt( "padded host texture (960x540 in 1024x1024), flat: the picture to within %.1e", worst ) );
+	}
+
 	return Verdict();
 }
 
@@ -582,6 +656,52 @@ int runIsometry( const Perturb& perturb )
 		                                          kDetailCells[ detail ], sideways ) );
 	}
 
+	//The same, turned on its side: a horizontal ridge must pull the print
+	//together in y by the same amount, with no stretch in x. This is the
+	//half of the solve -- Ayy's unpacking, the vertical transform -- that a
+	//vertical ridge never touches.
+	{
+		Rig rig;
+		if( !rig.Init( 960, 540, nullptr ) )
+			return 1;
+		rig.Bare();
+		const double y0 = 0.5;
+		rig.plugin.SetSheetForTest( transposed( RidgeSheet( static_cast< float >( y0 ), static_cast< float >( W ),
+		                                                    static_cast< float >( s ), 1.0f ) ) );
+		rig.Render( 1 );
+		const Floats field = rig.StretchField();
+		const int nx = rig.plugin.GridWidth(), ny = rig.plugin.GridHeight();
+		const double aspect = 960.0 / 540.0;
+		//The frame is only one unit tall, so the flat interval has to come
+		//from the ridge's mirror image's side: the domain is 2 tall and even
+		//about y = 1, so [ 1, 2 ] is the frame upside down and the stretch
+		//between y0 + W + D and 1 is flat sheet. Use the stretch over the
+		//whole frame height instead: its ends are pinned (u_y odd about both
+		//edges), so the ridge's pull must be spread as a uniform stretch
+		//over the rest -- and d u_y / dy off the ridge is + pulled / 1.
+		double worst = 0.0, sideways = 0.0;
+		for( double x : { 0.3, 0.9, 1.5 } )
+		{
+			const double D = 0.1, a = y0 - W - D, b = y0 + W + D;
+			const double creased = stretchAt( field, nx, ny, aspect, x, b, 1 ) - stretchAt( field, nx, ny, aspect, x, a, 1 );
+			//Flat sheet: slope of u_y over [ 0.02, a - 0.02 ] and [ b + 0.02, 0.98 ].
+			const double f0 = 0.02, f1 = a - 0.02, f2 = b + 0.02, f3 = 0.98;
+			const double flatRate =
+				( stretchAt( field, nx, ny, aspect, x, f1, 1 ) - stretchAt( field, nx, ny, aspect, x, f0, 1 )
+				  + stretchAt( field, nx, ny, aspect, x, f3, 1 ) - stretchAt( field, nx, ny, aspect, x, f2, 1 ) )
+				/ ( ( f1 - f0 ) + ( f3 - f2 ) );
+			worst = std::max( worst, std::fabs( ( flatRate * ( b - a ) - creased ) - pulled ) );
+			for( double y = 0.05; y < 0.95; y += 0.02 )
+				sideways = std::max( sideways, std::fabs( stretchAt( field, nx, ny, aspect, x, y, 0 ) ) );
+		}
+		const double coarsePixel = 1.0 / std::min( 540, 2 * ny );
+		const double bound       = std::max( 0.01 * pulled, 1.1 * 0.5 * s * s * coarsePixel );
+		Check( worst < bound, fmt( "the ridge on its side: pulled together in y by %.5f more than flat sheet, worst error "
+		                           "%.1e (bound %.1e)",
+		                           pulled, worst, bound ) );
+		Check( sideways < 1e-4 * pulled / W, fmt( "and no stretch along it, in x (%.1e)", sideways ) );
+	}
+
 	//And the composite reads the print from x - u: a coordinate card, read
 	//back, IS the material point each pixel shows.
 	{
@@ -622,9 +742,21 @@ int runLambert( const Perturb& perturb )
 {
 	std::printf( "\n=== lambert: each facet of a known crease is lit by the formula\n" );
 	const double x0 = 0.8, W = 0.25, s = 0.4, ambient = 0.35;
-	const double elevation = 35.0, azimuth = 30.0;
-	for( const auto& size : { std::pair< int, int > { 480, 270 }, std::pair< int, int > { 1280, 720 } } )
+	const double elevation = 35.0;
+	//A vertical ridge under a lamp at azimuth 30, then the ridge on its side
+	//under one at 120: between them both components of the lamp and of the
+	//normal are exercised, and a sign error in either fails one of them.
+	struct Case
 	{
+		bool onSide;
+		double azimuth;
+		int w, h;
+	};
+	for( const Case cs : { Case { false, 30.0, 480, 270 }, Case { false, 30.0, 1280, 720 }, Case { true, 120.0, 480, 270 },
+	                       Case { true, 120.0, 1280, 720 } } )
+	{
+		const double azimuth = cs.azimuth;
+		const std::pair< int, int > size { cs.w, cs.h };
 		const Floats white = flatCard( size.first, size.second, 1.0f );
 		Rig rig;
 		if( !rig.Init( size.first, size.second, &white ) )
@@ -633,7 +765,9 @@ int runLambert( const Perturb& perturb )
 		rig.Set( PT_AMBIENT, static_cast< float >( ambient ) );
 		rig.Set( PT_LAMP_ELEVATION, paramFor( elevation, 5.0, 90.0 ) );
 		rig.Set( PT_LAMP_AZIMUTH, paramFor( azimuth, 0.0, 360.0 ) );
-		rig.plugin.SetSheetForTest( RidgeSheet( static_cast< float >( x0 ), static_cast< float >( W ), static_cast< float >( s ), static_cast< float >( rig.width ) / rig.height ) );
+		const std::vector< Facet > ridge = RidgeSheet( static_cast< float >( cs.onSide ? 0.5 : x0 ), static_cast< float >( W ),
+		                                               static_cast< float >( s ), static_cast< float >( rig.width ) / rig.height );
+		rig.plugin.SetSheetForTest( cs.onSide ? transposed( ridge ) : ridge );
 		rig.Render( 1 );
 		const Floats out = rig.Output();
 
@@ -642,23 +776,26 @@ int runLambert( const Perturb& perturb )
 		double worst = 0.0, lo = 10.0, hi = 0.0;
 		for( int side = -1; side <= 1; side += 2 )
 		{
-			//The tent rises towards the spine: h = s ( W - |x - x0| ).
-			const double hx   = -side * s;
-			const double norm = std::sqrt( hx * hx + 1.0 );
-			const double nL   = ( -hx * L[ 0 ] + L[ 2 ] ) / norm;
+			//The tent rises towards the spine: h = s ( W - |x - x0| ), or in y.
+			const double g    = -side * s;
+			const double hx   = cs.onSide ? 0.0 : g, hy = cs.onSide ? g : 0.0;
+			const double norm = std::sqrt( hx * hx + hy * hy + 1.0 );
+			const double nL   = ( -hx * L[ 0 ] - hy * L[ 1 ] + L[ 2 ] ) / norm;
 			const double want = ( ambient + ( 1.0 - ambient ) * std::max( nL, 0.0 ) ) / ( ambient + ( 1.0 - ambient ) * L[ 2 ] );
-			const double x    = x0 + side * 0.5 * W;
-			const int px      = static_cast< int >( x * size.second );
-			for( int y = size.second / 4; y < size.second * 3 / 4; y += 5 )
+			const double at   = ( cs.onSide ? 0.5 : x0 ) + side * 0.5 * W;
+			for( int i = size.second / 4; i < size.second * 3 / 4; i += 5 )
 			{
-				const double got = out[ ( static_cast< size_t >( y ) * size.first + px ) * 4 ];
+				const int px     = cs.onSide ? i : static_cast< int >( at * size.second );
+				const int py     = cs.onSide ? static_cast< int >( at * size.second ) : i;
+				const double got = out[ ( static_cast< size_t >( py ) * size.first + px ) * 4 ];
 				worst            = std::max( worst, std::fabs( got - want ) );
 				lo               = std::min( lo, got );
 				hi               = std::max( hi, got );
 			}
 		}
-		Check( worst < 1e-5, fmt( "%dx%d: the two facets at %.4f and %.4f, worst error %.1e (bound 1e-5)", size.first,
-		                          size.second, lo, hi, worst ) );
+		Check( worst < 1e-5, fmt( "%dx%d, ridge %s, lamp at %.0f deg: the two facets at %.4f and %.4f, worst error %.1e "
+		                          "(bound 1e-5)",
+		                          size.first, size.second, cs.onSide ? "on its side" : "upright", azimuth, lo, hi, worst ) );
 	}
 	return Verdict();
 }
@@ -719,7 +856,7 @@ int runShadow( const Perturb& perturb )
 //===========================================================================
 int runMonotone( const Perturb& perturb )
 {
-	std::printf( "\n=== monotone: raising Crumple only ever raises the sheet; a sheet is the same sheet at any Crumple\n" );
+	std::printf( "\n=== monotone: raising Crumple only ever deepens the sheet; a sheet is the same sheet at any Crumple\n" );
 	SheetSettings settings;
 	settings.seed   = 7;
 	settings.layers = 4;
@@ -742,8 +879,9 @@ int runMonotone( const Perturb& perturb )
 	}
 	Check( same, fmt( "the same seed builds the same %zu junctions and %zu facets, bit for bit", junctions, facets ) );
 
-	//Every facet's corners rise monotonically with Crumple, from flat at 0
-	//to whole at 1. Measured on the facets the plugin would draw.
+	//Every facet's corners move monotonically AWAY from the flat sheet with
+	//Crumple -- up for a mountain, down for a valley, |h| never shrinking --
+	//from flat at 0 to whole at 1. Measured on the facets the plugin draws.
 	int backwards = 0;
 	double flatAt0 = 0.0, wholeAt1 = 0.0;
 	std::vector< Facet > last;
@@ -755,7 +893,8 @@ int runMonotone( const Perturb& perturb )
 		if( !last.empty() )
 			for( size_t f = 0; f < now.size(); ++f )
 				for( int k = 0; k < 3; ++k )
-					if( std::fabs( now[ f ].z[ k ] ) < std::fabs( last[ f ].z[ k ] ) - 1e-9f )
+					if( perturb.expectShallowing ? std::fabs( now[ f ].z[ k ] ) > std::fabs( last[ f ].z[ k ] ) + 1e-9f
+					                             : std::fabs( now[ f ].z[ k ] ) < std::fabs( last[ f ].z[ k ] ) - 1e-9f )
 						++backwards;
 		if( step == 0 )
 			for( const Facet& f : now )
@@ -766,7 +905,8 @@ int runMonotone( const Perturb& perturb )
 	for( const Layer& layer : b )
 		for( const Junction& j : layer.junctions )
 			wholeAt1 = std::max( wholeAt1, 1.0 - Formed( j, 1.0f ) );
-	Check( backwards == 0, fmt( "no corner of any facet ever sinks as Crumple rises (%d did)", backwards ) );
+	Check( backwards == 0, fmt( "no corner of any facet ever moves back towards the flat sheet as Crumple rises (%d did)",
+	                            backwards ) );
 	Check( flatAt0 == 0.0 && wholeAt1 == 0.0, fmt( "flat at Crumple 0 (%.1e), every junction whole at 1 (%.1e short)", flatAt0, wholeAt1 ) );
 
 	//The facets are a triangulation: every facet counter-clockwise, and they
@@ -812,6 +952,90 @@ int runMonotone( const Perturb& perturb )
 }
 
 //===========================================================================
+// --state
+//===========================================================================
+int runState( const Perturb& )
+{
+	std::printf( "\n=== state: what the host hands over is what it gets back\n" );
+
+	//A host-like context: a vertex array of its own bound, blending on with
+	//its own function, a clear colour, a scissor box, texture unit 3 active --
+	//none of which the plugin has any business keeping.
+	Rig rig;
+	if( !rig.Init( 320, 180 ) )
+		return 1;
+	GLuint hostArray = 0;
+	glGenVertexArrays( 1, &hostArray );
+	int problems = 0;
+	std::string what;
+
+	for( int frame = 0; frame < 3; ++frame )
+	{
+		glBindFramebuffer( GL_FRAMEBUFFER, rig.outputFBO );
+		glViewport( 7, 5, 300, 170 );
+		glBindVertexArray( hostArray );
+		glEnable( GL_BLEND );
+		glBlendFuncSeparate( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO );
+		glClearColor( 0.2f, 0.3f, 0.4f, 0.5f );
+		glEnable( GL_SCISSOR_TEST );
+		glScissor( 0, 0, 320, 180 );
+		glActiveTexture( GL_TEXTURE3 );
+		glActiveTexture( GL_TEXTURE0 );
+		glUseProgram( 0 );
+
+		rig.plugin.SetTime( frame / 60.0 );
+		if( rig.plugin.ProcessOpenGL( &rig.process ) != FF_SUCCESS )
+			return 1;
+
+		GLint viewport[ 4 ] = {}, array = 0, program = 0, unit = 0, fbo = 0, src = 0, dst = 0;
+		GLfloat clear[ 4 ] = {};
+		glGetIntegerv( GL_VIEWPORT, viewport );
+		glGetIntegerv( GL_VERTEX_ARRAY_BINDING, &array );
+		glGetIntegerv( GL_CURRENT_PROGRAM, &program );
+		glGetIntegerv( GL_ACTIVE_TEXTURE, &unit );
+		glGetIntegerv( GL_FRAMEBUFFER_BINDING, &fbo );
+		glGetIntegerv( GL_BLEND_SRC_RGB, &src );
+		glGetIntegerv( GL_BLEND_DST_RGB, &dst );
+		glGetFloatv( GL_COLOR_CLEAR_VALUE, clear );
+
+		auto expect = [ & ]( bool ok, const char* name ) {
+			if( !ok )
+			{
+				++problems;
+				what += std::string( " " ) + name;
+			}
+		};
+		expect( viewport[ 0 ] == 7 && viewport[ 1 ] == 5 && viewport[ 2 ] == 300 && viewport[ 3 ] == 170, "viewport" );
+		expect( array == static_cast< GLint >( hostArray ), "vertex-array" );
+		expect( program == 0, "program" );
+		expect( unit == GL_TEXTURE0, "active-unit" );
+		expect( fbo == static_cast< GLint >( rig.outputFBO ), "framebuffer" );
+		expect( glIsEnabled( GL_BLEND ) && src == GL_SRC_ALPHA && dst == GL_ONE_MINUS_SRC_ALPHA, "blend" );
+		expect( glIsEnabled( GL_SCISSOR_TEST ), "scissor" );
+		expect( clear[ 0 ] == 0.2f && clear[ 1 ] == 0.3f && clear[ 2 ] == 0.4f && clear[ 3 ] == 0.5f, "clear-colour" );
+		for( int u = 0; u < 8; ++u )
+		{
+			GLint bound = 0;
+			glActiveTexture( static_cast< GLenum >( GL_TEXTURE0 + u ) );
+			glGetIntegerv( GL_TEXTURE_BINDING_2D, &bound );
+			expect( bound == 0, "texture-unit" );
+		}
+		glActiveTexture( GL_TEXTURE0 );
+	}
+
+	glDisable( GL_SCISSOR_TEST );
+	glDisable( GL_BLEND );
+	glBindVertexArray( 0 );
+	glDeleteVertexArrays( 1, &hostArray );
+
+	Check( problems == 0, fmt( "three frames: viewport, vertex array, program, active unit, framebuffer, blend, scissor, "
+	                           "clear colour and eight texture units all as the host left them (%d wrong:%s)",
+	                           problems, what.empty() ? " none" : what.c_str() ) );
+	return Verdict();
+}
+
+
+//===========================================================================
 // --negative
 //===========================================================================
 int runNegative()
@@ -847,7 +1071,12 @@ int runNegative()
 	{
 		Perturb p;
 		p.reseeded = true;
-		cases.push_back( { "monotone", runMonotone, p, "compare against the next seed's sheet" } );
+		cases.push_back( { "monotone (seed)", runMonotone, p, "compare against the next seed's sheet" } );
+	}
+	{
+		Perturb p;
+		p.expectShallowing = true;
+		cases.push_back( { "monotone (depth)", runMonotone, p, "expect the sheet to flatten as Crumple rises" } );
 	}
 
 	int unfalsifiable = 0;
@@ -1203,7 +1432,7 @@ int main( int argc, char** argv )
 			             "  --pipe            raw RGBA frames on stdin, raw RGBA frames on stdout\n"
 			             "  --film N          N frames of the card, raw RGBA frames on stdout\n"
 			             "  --script PATH     parameter cues for --pipe/--film: 'frame Name value'\n\n"
-			             "  --flat --isometry --lambert --shadow --monotone --negative --bench\n" );
+			             "  --flat --isometry --lambert --shadow --monotone --state --negative --bench\n" );
 			return 0;
 		}
 		else if( argument == "--out" && hasNext )
@@ -1232,7 +1461,8 @@ int main( int argc, char** argv )
 		else if( argument == "--height" && hasNext )
 			height = std::atoi( argv[ ++i ] );
 		else if( argument == "--flat" || argument == "--isometry" || argument == "--lambert" || argument == "--shadow"
-		         || argument == "--monotone" || argument == "--negative" || argument == "--bench" )
+		         || argument == "--monotone" || argument == "--negative" || argument == "--bench"
+		         || argument == "--state" )
 			mode = argument.substr( 2 );
 		else if( argument == "--size" && hasNext )
 		{
@@ -1288,6 +1518,8 @@ int main( int argc, char** argv )
 		result = runLambert( none );
 	else if( mode == "shadow" )
 		result = runShadow( none );
+	else if( mode == "state" )
+		result = runState( none );
 	else if( mode == "negative" )
 		result = runNegative();
 	else if( mode == "bench" )

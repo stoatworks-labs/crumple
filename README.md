@@ -9,8 +9,8 @@
 > the ridge's width, and it does, at every Detail. `--lambert` checks each
 > facet's shading against the formula, and `--shadow` checks a ridge's shadow
 > against H/tan e. `--flat` requires Crumple 0 to be the identity.
-> `--monotone` requires crumpling only ever to raise the sheet, and the facets
-> to tile the frame. `crtest --negative` re-runs every check against a
+> `--monotone` requires crumpling only ever to deepen the sheet, and the
+> facets to tile the frame. `crtest --negative` re-runs every check against a
 > deliberately wrong model and fails if any of them *passes*. A control sweep
 > fails if any parameter does nothing.
 
@@ -95,13 +95,14 @@ What is measured, on this machine:
 
 | | |
 | --- | --- |
-| isometry | a straight ridge of slope 0.5 pulls the print in by **0.03000**, against ½s²·2W = 0.03000. Worst error 8e-5 at Detail 512, 1.1e-4 at 1024, 3.9e-4 at 256 (one coarse pixel of facet edge). No sideways stretch (1e-9) |
+| isometry | a straight ridge of slope 0.5 pulls the print in by **0.03000**, against ½s²·2W = 0.03000. Worst error 8e-5 at Detail 512, 1.1e-4 at 1024, 3.9e-4 at 256 (one coarse pixel of facet edge). No sideways stretch (1e-9). The same ridge turned on its side pulls in y to 2.2e-4 |
 | the print | is read from x − u, to **4.5e-6** across a row |
-| Lambert | the two facets of a known ridge, at two rasters, to **1e-7** |
+| Lambert | the two facets of a known ridge, upright under a lamp at 30° and on its side under one at 120°, at two rasters, to **1e-7** |
 | shadow | a ridge 0.08 high under a 20° lamp ends its shadow at **0.7824** (1080p), against H/tan e = 0.7802; the bound is the march step's worth, 0.0064 |
-| identity | Crumple 0: the output is the picture **exactly**, at two rasters |
-| monotone | 2,550 junctions and 5,032 facets, the same bit for bit from the same seed. No corner ever sinks as Crumple rises, and every facet tiles the frame |
-| negative controls | **5** deliberately wrong models, **all 5** detected |
+| identity | Crumple 0: the output is the picture **exactly**, at two rasters and with a host texture padded beyond its picture (MaxUV). Crumpled hard, the padding never shows |
+| monotone | 2,466 junctions and 4,863 facets, the same bit for bit from the same seed. No corner ever moves back towards the flat sheet as Crumple rises, and the facets tile the frame |
+| GL state | viewport, vertex array, program, active unit, framebuffer, blend, scissor, clear colour and eight texture units are all as the host left them |
+| negative controls | **6** deliberately wrong models, **all 6** detected. The frame-coverage line of `--monotone` has none |
 | dead controls | **20** parameters, all live |
 
 Render cost (`crtest --bench`, four generations): a still sheet is built once,
@@ -139,7 +140,8 @@ are universal (arm64 + x86_64); Windows needs GLEW via vcpkg.
     ./build/crtest --isometry                 the print pulls in by 1/2 s^2
     ./build/crtest --lambert                  each facet lit by the formula
     ./build/crtest --shadow                   a ridge's shadow is H / tan e long
-    ./build/crtest --monotone                 crumpling only raises the sheet
+    ./build/crtest --monotone                 crumpling only deepens the sheet
+    ./build/crtest --state                    the host's GL state comes back as it went in
     ./build/crtest --negative                 every check above, against a wrong model
     ./build/crtest --bench                    still and moving, 720p through 4K
     python3 tools/sweep.py                    no control is silently dead

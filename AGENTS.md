@@ -99,6 +99,28 @@ shortened the shadow by s·step/(2 tan e). The step count is now
 `ShadowSteps()`: one every 1.5 pixels of a picture of at most 1080 lines, 16
 to 96 steps. The harness uses the same function to derive its bound.
 
+**An independent review found five more.**
+
+- **Three texture units cannot be unwound by the scoped bindings.** The
+  composite left the sheet texture bound on unit 1 in the host's context.
+  `releaseTextureUnits` fixes it, and `--state` now checks.
+- **The host's clear colour was not put back.** Neither were depth test,
+  culling and scissor forced off. `SavedGLState` now handles all four.
+- **`SetSheetForTest( {} )` did not rebuild.** The cache still matched the
+  generator's settings. It now clears `built`.
+- **The shadow reach came from twice the tallest single corner.** The layers
+  ADD, so a four-layer sheet at full Relief has a range a fifth bigger than
+  that, and its valleys were lit where a peak should shade them. The reach
+  now comes from the sum of each layer's highest minus its lowest.
+- **At the bottom of Scale, the junction cap made the finest generations
+  coincide.** They were three copies of one spacing, built in 12–18 ms. The
+  cap now iterates to a fixed point, and the capped layer is the last.
+
+The review also showed `--monotone`'s wording was wrong ("raises": half the
+junctions are valleys and go DOWN), and that the lamp's y component and the
+solve's y axis were never tested. Now a ridge on its side is lit from 120° and
+must pull the print in along y.
+
 **The `x − u` readback also sees the light.** Checking that the composite reads
 the print from x − u needs every other term to be the identity, and Lambert is
 not: Ambient 1 makes it so.
@@ -114,10 +136,13 @@ not: Ambient 1 makes it so.
 | `--lambert` | 1e-5 | the formula; measured 1e-7 |
 | `--shadow` | s·step/(2 tan e) + 1.5 px | a peak can fall between two march samples |
 | `--monotone` | exact | integer hashing, and smoothstep arrivals |
+| `--state` | exact | every piece of GL state a host could care about, after three frames |
 
-Each has a negative control (one 8-bit step brighter, 5% more pull, the lamp
-one degree higher, 15% longer shadows, the next seed's sheet), and all five
-fail as they must.
+Each has a negative control: one 8-bit step brighter, 5% more pull, the lamp
+one degree higher, 15% longer shadows, the next seed's sheet, and a sheet
+expected to flatten as it crumples. All six fail as they must. `--monotone`'s
+frame-coverage line and `--state` have none. `--state` was instead shown to
+fail with the unit-1 fix removed, in millpond, which shares it.
 
 ## Decisions taken without asking
 

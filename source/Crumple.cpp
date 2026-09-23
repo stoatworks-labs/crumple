@@ -483,7 +483,7 @@ FFResult CrumplePlugin::ProcessOpenGL( ProcessOpenGLStruct* pgl )
 
 		std::vector< SheetVertex > vertices;
 		vertices.reserve( drawn.size() * 3 );
-		tallest = 0.0f;
+		float highest[ kMaxLayers ] = {}, lowest[ kMaxLayers ] = {};
 		for( const Facet& f : drawn )
 		{
 			//The facet's plane, h = z0 + hx ( x - x0 ) + hy ( y - y0 ).
@@ -510,9 +510,18 @@ FFResult CrumplePlugin::ProcessOpenGL( ProcessOpenGLStruct* pgl )
 				vertices.push_back( SheetVertex { f.x[ k ], f.y[ k ], f.z[ k ], hx, hy,
 				                                  { f.crease[ 0 ], f.crease[ 1 ], f.crease[ 2 ] },
 				                                  { altitude[ 0 ], altitude[ 1 ], altitude[ 2 ] } } );
-				tallest = std::max( tallest, std::fabs( f.z[ k ] ) );
+				const int layer   = std::clamp( f.layer, 0, kMaxLayers - 1 );
+				highest[ layer ] = std::max( highest[ layer ], f.z[ k ] );
+				lowest[ layer ]  = std::min( lowest[ layer ], f.z[ k ] );
 			}
 		}
+		//The layers add, so the sheet's range is the sum of theirs -- not twice
+		//its tallest single corner, which a four-layer sheet at full Relief
+		//outruns by a fifth, leaving valleys lit that a peak should shade.
+		relief = 0.0f;
+		for( int l = 0; l < kMaxLayers; ++l )
+			relief += highest[ l ] - lowest[ l ];
+
 		glBindBuffer( GL_ARRAY_BUFFER, sheetVBO );
 		glBufferData( GL_ARRAY_BUFFER, static_cast< GLsizeiptr >( vertices.size() * sizeof( SheetVertex ) ), vertices.data(),
 		              GL_STREAM_DRAW );
@@ -599,9 +608,9 @@ FFResult CrumplePlugin::ProcessOpenGL( ProcessOpenGLStruct* pgl )
 	const float azimuth   = LampAzimuthFromParam( params[ PT_LAMP_AZIMUTH ] ) * kPi / 180.0f;
 	const float lamp[ 3 ] = { std::cos( elevation ) * std::cos( azimuth ), std::cos( elevation ) * std::sin( azimuth ),
 		                      std::sin( elevation ) };
-	//How far a shadow can reach: the tallest junction (twice, for layers that
-	//stack) over the lamp's slope, capped where it stops mattering.
-	const float reach = std::min( 2.0f * tallest / std::max( std::tan( elevation ), 0.05f ) + 0.002f, 0.6f );
+	//How far a shadow can reach: the most the summed sheet can rise above any
+	//point of it, over the lamp's slope, capped where it stops mattering.
+	const float reach = std::min( relief / std::max( std::tan( elevation ), 0.05f ) + 0.002f, 0.6f );
 
 	glBindFramebuffer( GL_FRAMEBUFFER, pgl->HostFBO );
 	glViewport( hostViewport[ 0 ], hostViewport[ 1 ], hostViewport[ 2 ], hostViewport[ 3 ] );
@@ -636,6 +645,9 @@ FFResult CrumplePlugin::ProcessOpenGL( ProcessOpenGLStruct* pgl )
 		compositeShader.Set( "View", optionIndex( params[ PT_VIEW ], static_cast< int >( View::Count ) ) );
 		compositeShader.Set( "MixAmount", params[ PT_MIX ] );
 		quad.Draw();
+
+		//Three units: the scoped bindings cannot unwind them all. See GLState.h.
+		releaseTextureUnits( 3 );
 	}
 
 	return FF_SUCCESS;
@@ -680,6 +692,9 @@ void CrumplePlugin::SetSheetForTest( const std::vector< Facet >& facets )
 {
 	forced  = facets;
 	forcing = !facets.empty();
+	//Going back to the generator with the same settings must still rebuild:
+	//the last sheet built was the forced one.
+	built = false;
 }
 
 void CrumplePlugin::SetClockScaleForTest( double scale )

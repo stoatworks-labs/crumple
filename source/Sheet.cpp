@@ -113,11 +113,18 @@ std::vector< std::vector< Junction > > BuildJunctions( const SheetSettings& s )
 		//spacing, somewhere inside it. Evenly spread facets, none of them
 		//slivers, and a count that follows the spacing exactly.
 		float spacing = s.scale * std::pow( kLayerRatio, static_cast< float >( layer ) );
+		bool capped   = false;
+		//The cap depends on the area, and the area on the spacing (the margin
+		//is a cell wide): iterate to the fixed point, which a few steps reach
+		//because the margin is a small part of the area.
+		for( int pass = 0; pass < 8; ++pass )
 		{
 			const float reach = spacing + kMargin;
 			const float area  = ( s.aspect + 2.0f * reach ) * ( 1.0f + 2.0f * reach );
-			if( area / ( spacing * spacing ) > kMaxJunctions )
-				spacing = std::sqrt( area / kMaxJunctions );
+			if( area / ( spacing * spacing ) <= kMaxJunctions * 0.98f )
+				break;
+			spacing = std::sqrt( area / ( kMaxJunctions * 0.98f ) );
+			capped  = true;
 		}
 
 		//The margin is a whole cell past the frame and a little more, so the
@@ -149,6 +156,8 @@ std::vector< std::vector< Junction > > BuildJunctions( const SheetSettings& s )
 				junctions.push_back( p );
 			}
 		layers.push_back( std::move( junctions ) );
+		if( capped )
+			break;
 	}
 	return layers;
 }
@@ -273,6 +282,7 @@ std::vector< Facet > FacetsFrom( const std::vector< Layer >& layers, const Sheet
 				crumpled[ t ].x[ k ] = j.x;
 				crumpled[ t ].y[ k ] = j.y;
 				crumpled[ t ].z[ k ] = j.height * Formed( j, s.crumple ) * s.relief;
+				crumpled[ t ].layer  = static_cast< int >( &layer - layers.data() );
 			}
 
 		//The creases are measured on the sheet as crumpled, BEFORE it is

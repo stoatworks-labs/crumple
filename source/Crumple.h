@@ -123,7 +123,7 @@ private:
 	GLsizei builtHeight = 0;
 	int builtGrid       = 0;
 	bool built          = false;
-	float tallest       = 0.0f;
+	float relief        = 0.0f;///< the summed sheet's highest minus its lowest
 
 	//-------------------------------------------------------------------
 	// Time, for the audio envelope only. Rosette's unit vote.

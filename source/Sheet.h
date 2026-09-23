@@ -39,6 +39,7 @@ struct Facet
 	float y[ 3 ] = {};
 	float z[ 3 ] = {};
 	float crease[ 3 ] = {};
+	int layer         = 0;///< which generation: the layers ADD, so their ranges do too
 };
 
 struct SheetSettings
@@ -61,7 +62,10 @@ constexpr float kSteepness = 0.55f;
 
 /// The most junctions one layer may have. A 0.6-frame first generation with
 /// four layers asks for about 1,100 in its finest; Scale at the bottom of its
-/// travel would ask for far more, and is held here instead.
+/// travel would ask for far more. The layer that hits this is built at the
+/// spacing the cap allows and is the LAST: any finer generation would be
+/// capped to the same spacing and lie on top of it, three copies of one
+/// layer rather than three generations.
 constexpr int kMaxJunctions = 1600;
 
 /// A junction: where it is, and the height it will reach when fully formed.
