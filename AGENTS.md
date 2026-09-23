@@ -171,8 +171,9 @@ Verified on this Mac (M4 Max, macOS 26.4.1):
 
 Assumed or not done:
 
-- never loaded into Resolume;
-- never built on Windows, where float blending of RGBA32F (used by the sheet
-  draw) is standard on DX11-class GPUs but untested;
+- loaded into Resolume only on Windows, in win-lab's Arena 7.27.1 on llvmpipe
+  (no GPU), and never in Arena on macOS;
+- float blending of RGBA32F (used by the sheet draw) worked there, and is
+  standard on DX11-class GPUs, but is untested on a real Windows GPU;
 - Resolume's FFT bins are as rosette assumed them;
 - the limits in the README's Status.

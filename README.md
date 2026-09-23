@@ -84,12 +84,26 @@ the same sheet at any raster.
 
 **v0.1.0, 2026-09-23, and honestly early.**
 
-It has **never been loaded into Resolume**. `oxbow probe` reads the bundle as
-`SW Crumple` / `CR01` / effect, and `oxbow selftest` instantiates it through
-the host's own path. Nothing else has run it. There is no OpenFX port, no
-browser demo and no factory presets. It has only been built and measured on
-macOS (Apple Silicon, M4 Max); a Windows build ships from CI and nothing has
-run it.
+It has been loaded into **Resolume Arena 7.27.1 on Windows only, and only on
+a software rasteriser**. The machine is win-lab, an x64 Windows 11 VM with
+no GPU, where OpenGL is Mesa llvmpipe 26.2.0. The DLL was built there with
+MSVC 2022 and vcpkg's `x64-windows-static-md`. In Arena:
+
+- it loaded, and was registered and listed as `SW Crumple` / `CR01`, an
+  effect;
+- all 26 controls came back with the declared name, order, type, range and
+  default;
+- the shaders compiled and it rendered. The plugin's own log recorded
+  `GL vendor=Mesa … 4.5 (Core Profile)` and `initialised`;
+- all 22 controls the probe sweeps moved the picture;
+- Arena stayed up and logged no errors throughout.
+
+`oxbow selftest` on the same VM rendered 120 frames with no GL error. Nothing
+is known about performance on Windows, or about the RGBA32F float blending
+the sheet draw relies on when it runs on a real Windows GPU. It has never
+been loaded into Arena on macOS. There is no OpenFX port, no browser demo and
+no factory presets. Everything below was built and measured on macOS (Apple
+Silicon, M4 Max).
 
 What is measured, on this machine:
 

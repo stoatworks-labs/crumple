@@ -1297,11 +1297,15 @@ float valueAt( const Track& track, int frame )
 /// synthetic 60 fps clock -- so a stall in ffmpeg cannot show up as the water
 /// speeding up afterwards.
 int runPipe( int width, int height, const std::string& scriptPath, int filmFrames, bool beat,
-             const std::vector< std::string >& settings )
+             const std::vector< std::string >& settings, double fps )
 {
 	Rig rig;
 	if( !rig.Init( width, height ) )
 		return 1;
+	//The clock the frames are stamped with: a take at 30 fps must run the
+	//effect at 30 fps, or everything in it moves at twice the speed it
+	//will play back at.
+	rig.fps = fps;
 	if( beat )
 		rig.feed = AudioFeed::Pulses;
 
@@ -1414,6 +1418,7 @@ int main( int argc, char** argv )
 	std::string mode;
 	std::string scriptPath;
 	int filmFrames = -1;
+	double fps     = 60.0;
 
 	for( int i = 1; i < argc; ++i )
 	{
@@ -1431,7 +1436,8 @@ int main( int argc, char** argv )
 			             "  --list            print every parameter and its default, then exit\n"
 			             "  --pipe            raw RGBA frames on stdin, raw RGBA frames on stdout\n"
 			             "  --film N          N frames of the card, raw RGBA frames on stdout\n"
-			             "  --script PATH     parameter cues for --pipe/--film: 'frame Name value'\n\n"
+			             "  --script PATH     parameter cues for --pipe/--film: 'frame Name value'\n"
+			             "  --fps N           the clock for --pipe/--film (default 60)\n\n"
 			             "  --flat --isometry --lambert --shadow --monotone --state --negative --bench\n" );
 			return 0;
 		}
@@ -1454,6 +1460,8 @@ int main( int argc, char** argv )
 			mode       = "pipe";
 			filmFrames = std::max( 1, std::atoi( argv[ ++i ] ) );
 		}
+		else if( argument == "--fps" && hasNext )
+			fps = std::max( 1.0, std::atof( argv[ ++i ] ) );
 		else if( argument == "--script" && hasNext )
 			scriptPath = argv[ ++i ];
 		else if( argument == "--width" && hasNext )
@@ -1525,7 +1533,7 @@ int main( int argc, char** argv )
 	else if( mode == "bench" )
 		result = runBench();
 	else if( mode == "pipe" )
-		result = runPipe( width, height, scriptPath, filmFrames, beat, settings );
+		result = runPipe( width, height, scriptPath, filmFrames, beat, settings, fps );
 	else
 	{
 		Rig rig;
