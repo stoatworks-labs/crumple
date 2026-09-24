@@ -177,3 +177,61 @@ Assumed or not done:
   standard on DX11-class GPUs, but is untested on a real Windows GPU;
 - Resolume's FFT bins are as rosette assumed them;
 - the limits in the README's Status.
+
+## The browser demo
+
+`demo/` is the page at **crumple-demo.stoatworks-labs.com**, built on the shared kit in `infrastructure/stoatworks-backend/resolume-demo/`, vendored into `demo/vendor/` by its `sync.sh` — fix a kit bug THERE, never here. There is no build step: `cf-run npx wrangler deploy` from the repo root uploads `demo/` as it stands, and the page is verified by content (its `<title>`), never by status code.
+
+**What is the plugin's own code.** All eight shaders — `kVertexShader`,
+`kSheetVertexShader`, `kSheetShader`, `kStrainShader`, `kSourceShader`,
+`kFFTShader`, `kSolveShader`, `kCompositeShader` — copied into `demo/plugin.js`
+character for character. `demo/tools/check_shaders.py` compares them and
+`tools/verify.sh` runs it as its "Demo shaders" step.
+
+**What is a port, checked by a reader and nothing else.** `Controls.cpp`, all of
+`Sheet.cpp` (the `lowbias32` hash with `Math.imul`, the stratified junctions and
+their fixed-point cap, Bowyer-Watson in double, the shared edges, the crease
+angles, `Formed`, `FacetsFrom`), and the frame sequence of `ProcessOpenGL`: the
+eleven-float vertex, the rebuild-only-when-something-moved test, `chooseGrid`,
+`ShadowSteps`, the shadow reach and the lamp. Cross-checked by hand once, on
+2026-09-24, and nothing re-runs it: at the defaults and seeds 0, 17 and 99 the
+port builds the same junction counts (70, 228, 960) and the SAME triangulations
+(identical facet counts per layer — 2459, 2467 and 2470 in all) as the compiled
+`Sheet.cpp`, and the summed heights, crease angles and weighted corners agree to
+about 1e-7 relative — float against double rounding, the port applying
+`Math.fround` where the C++ stores a float. To redo it, slice the block from
+`Controls.cpp, ported` to `Crumple.cpp's helpers` out of `plugin.js` into a `new
+Function` under node, and print the same sums from a one-file C++ program built
+against `source/Sheet.cpp` and `source/Controls.cpp`.
+
+### The decisions, and why
+
+- **`noperspective` is removed from the two sheet stages at load, by one named
+  function (`withoutNoperspective`).** GLSL ES 3.00 has no such qualifier (it
+  arrived in ES 3.20) and WebGL2 rejects the shader outright. It is the only
+  change the page makes to the plugin's text, and it changes no arithmetic:
+  every sheet vertex is emitted with `gl_Position.w = 1.0`, and
+  perspective-correct interpolation divides by w. The copies in `plugin.js` stay
+  verbatim, so the drift check still sees the plugin's text; the page, the
+  header comment and this section all say so. Chrome does expose
+  `NV_shader_noperspective_interpolation`, but the kit's `port()` puts its
+  precision lines before anything a page could add, and an `#extension` after
+  them is rejected in ESSL 3 — so using it would mean bypassing the kit's
+  `Program`, for no change in the picture.
+- **Three float extensions, and each one's absence throws.**
+  `EXT_color_buffer_float` (RGBA32F targets throughout), `EXT_float_blend` (the
+  fold generations sum by additive blending into RGBA32F) and
+  `OES_texture_float_linear` (the sheet, the strain's mip chain and the stretch
+  are read LINEAR; without it WebGL2 samples them as black and the page would
+  show an uncrumpled print instead of an error). `generateMipmap` on RGBA32F is
+  legal in WebGL2 once the format is both renderable and filterable, which those
+  extensions make it.
+- **The stretch buffers wrap.** The kit's `PassBuffer` clamps; the plugin
+  allocates the stretch with `Wrap::Repeat`, so the page sets REPEAT itself
+  after each `ensure()`.
+- **Audio and Audio Scrunch are absent, not dead.** With no spectrum the
+  plugin's analyser reports a level and kick of 0 and adds nothing to Crumple, so
+  the removal is exact.
+- **The default clip is the geometry card**: straight lines are what show the
+  print being pulled in at a crease.
+- **The About block is absent**; its links are in the page header.

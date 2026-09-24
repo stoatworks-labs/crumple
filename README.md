@@ -140,7 +140,7 @@ MSVC 2022 and vcpkg's `x64-windows-static-md`. In Arena:
 `oxbow selftest` on the same VM rendered 120 frames with no GL error. Nothing
 is known about performance on Windows, or about the RGBA32F float blending
 the sheet draw relies on when it runs on a real Windows GPU. It has never
-been loaded into Arena on macOS. There is no OpenFX port, no browser demo and
+been loaded into Arena on macOS. There is no OpenFX port and
 no factory presets. Everything below was built and measured on macOS (Apple
 Silicon, M4 Max).
 
@@ -175,6 +175,15 @@ What is **not** verified, and is the honest limit of this release:
 - **A directional lamp, a flat ambient, no bounce light** between facets.
 - **The sheet's edges are held to the frame's**, as if taped down; a real
   sheet's edges pull in.
+
+**Browser demo:** [crumple-demo.stoatworks-labs.com](https://crumple-demo.stoatworks-labs.com)
+runs the plugin's eight shaders ported to WebGL2, and
+`demo/tools/check_shaders.py` holds that GLSL character-for-character against
+`source/Shaders.cpp` (`tools/verify.sh` runs it). The sheet generator
+(`Sheet.cpp`), the control conversions and the frame sequence are a hand
+translation to JavaScript that nothing checks but a reader. One word is removed
+from the sheet pass at load: `noperspective`, which GLSL ES 3.00 lacks and which
+changes no arithmetic when every vertex has w = 1. The audio control is absent.
 
 ## Build
 
