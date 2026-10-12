@@ -1,35 +1,30 @@
 # crumple
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. It has **never been
+> (Anthropic), directed and reviewed by a human author. It's **never been
 > loaded into Resolume**. Everything below is measured by an offline harness
-> that drives the real plugin class in a headless GL context. `crtest
-> --isometry` checks the central claim, that paper bends but does not stretch:
-> across a straight ridge of slope s the print must pull in by exactly ½s² of
-> the ridge's width, and it does, at every Detail. `--lambert` checks each
-> facet's shading against the formula, and `--shadow` checks a ridge's shadow
-> against H/tan e. `--flat` requires Crumple 0 to be the identity.
-> `--monotone` requires crumpling only ever to deepen the sheet, and the
-> facets to tile the frame. `crtest --negative` re-runs every check against a
-> deliberately wrong model and fails if any of them *passes*. A control sweep
-> fails if any parameter does nothing.
+> that drives the plugin's own class in a headless GL context, starting with the
+> central claim, that paper bends but doesn't stretch: across a straight ridge of
+> slope s the print must pull in by exactly ½s² of the ridge's width, and it does,
+> at every Detail. Every check is also run against a wrong model to show it can
+> fail. The full rundown is in the Status section below.
 
-Crumpled paper for Resolume Arena/Avenue, as an FFGL effect. The clip is
-printed on a sheet that is crumpled, then smoothed out again, under a desk
-lamp.
+Crumpled paper for Resolume Arena and Avenue, as an FFGL effect. The clip is
+printed on a sheet that gets crumpled, then smoothed out again, under a desk
+lamp. Roughly what happens to the running order by the second half of any show.
 
 ![A printed page, crumpled: facets lit and shaded by a lamp from the top left, the ruled grid and lines of text kinking at every crease](docs/hero.png)
 
 <sub>The harness's own card (a ruled grid, a headline, lines of text, a
 photograph) at the plugin's defaults. Rendered by the plugin's offline harness
-(`crtest`), not captured from Resolume.</sub>
+(`crtest`) rather than captured from Resolume.</sub>
 
 [![Crumple — crumpled paper as an effect, for Resolume](docs/video-thumb.png)](https://www.youtube.com/watch?v=wWfb8NyeoY8)
 
-*[Watch it](https://www.youtube.com/watch?v=wWfb8NyeoY8) — 42 seconds: a print crumpled from flat, straight lines kinking at the creases, the
-lamp coming down and swinging round, and the sheet flattened with its crease marks
-left in. Every frame is the real plugin's output, rendered by its offline harness
-from Resolume's own demo clips rather than captured from Resolume.*
+*[Watch it](https://www.youtube.com/watch?v=wWfb8NyeoY8) (42 seconds): a print crumpled from
+flat, straight lines kinking at the creases, the lamp coming down and swinging round, and the
+sheet flattened with its crease marks left in. It's all the plugin's own output, rendered by its
+offline harness from Resolume's own demo clips rather than captured from Resolume.*
 
 <!-- downloads:start -->
 
@@ -65,32 +60,32 @@ macOS builds are signed and notarised and open normally. The Windows builds are 
 
 ## The one idea
 
-**Paper bends but does not stretch.** Crumpled paper is facets and creases:
+**Paper bends but doesn't stretch.** Crumpled paper is facets and creases:
 each facet is nearly flat, because a sheet can curve one way without
 stretching but not two, and the facets meet along straight creases. The sheet
-here is exactly that. Crease junctions are scattered, joined by a Delaunay
+here is just that. Crease junctions are scattered, joined by a Delaunay
 triangulation and given heights, so every triangle is a flat facet and every
 edge a straight crease. There are up to four generations of it, each 0.45
 times finer and arriving later, the way a hand crumples: big folds first,
 then smaller ones inside them.
 
 Where the sheet tilts, the print on it has to come from somewhere. The ink
-does not stretch with the paper; it is pulled in. The in-plane displacement
+doesn't stretch with the paper; it gets pulled in. The in-plane displacement
 that keeps the sheet unstretched to second order in slope (Föppl–von Kármán:
 sym∇u + ½∇h⊗∇h = 0) is solved in least squares, one Fourier mode at a time,
 and the print is read from where the sheet pulled it.
 
-What falls out of that, rather than being drawn:
+What falls out of that, without anything being drawn on:
 
 - **The print kinks at every crease.** A straight line crossing a crease
   bends there, because the facets either side pull it in by different
-  amounts. A texture overlay cannot do this; it is the tell of real crumpled
+  amounts. A texture overlay can't do this, and it's the tell of real crumpled
   paper.
 - **Facet-by-facet light.** Each facet takes the lamp at its own angle.
   Lambert is normalised to the flat sheet, so a flat sheet is exactly the
   picture.
 - **Shadows** from the ridges at a low lamp.
-- **The marks stay when it is smoothed out.** Flatten lowers every facet, but
+- **The marks stay when it's smoothed out.** Flatten lowers every facet, but
   the fibres broken along each crease were measured on the sheet as crumpled,
   so a flattened sheet still shows them.
 
@@ -121,9 +116,9 @@ the same sheet at any raster.
 
 ## Status
 
-**v0.1.0, 2026-09-23, and honestly early.**
+**v0.1.0, 2026-09-23, and still early days.**
 
-It has been loaded into **Resolume Arena 7.27.1 on Windows only, and only on
+It's been loaded into **Resolume Arena 7.27.1 on Windows only, and only on
 a software rasteriser**. The machine is win-lab, an x64 Windows 11 VM with
 no GPU, where OpenGL is Mesa llvmpipe 26.2.0. The DLL was built there with
 MSVC 2022 and vcpkg's `x64-windows-static-md`. In Arena:
@@ -139,12 +134,12 @@ MSVC 2022 and vcpkg's `x64-windows-static-md`. In Arena:
 
 `oxbow selftest` on the same VM rendered 120 frames with no GL error. Nothing
 is known about performance on Windows, or about the RGBA32F float blending
-the sheet draw relies on when it runs on a real Windows GPU. It has never
-been loaded into Arena on macOS. There is no OpenFX port and
-no factory presets. Everything below was built and measured on macOS (Apple
-Silicon, M4 Max).
+the sheet draw relies on when it runs on a real Windows GPU. It's never been
+loaded into Arena on macOS. There's no OpenFX port and there are no factory
+presets. Everything below was built and measured on macOS (Apple Silicon, M4
+Max).
 
-What is measured, on this machine:
+What's measured, on this Mac:
 
 | | |
 | --- | --- |
@@ -163,11 +158,11 @@ and each later frame is the composite alone, **0.1–0.3 ms** from 720p to 4K. A
 moving sheet (Crumple automated) is rebuilt every frame: **2.3 ms at 720p,
 2.5 at 1080p, 2.9 at 4K**.
 
-What is **not** verified, and is the honest limit of this release:
+What **isn't** verified yet:
 
 - **Second order in slope.** The isometry is the small-slope one, so at the
   steepest Relief the print is pulled in less than a fully nonlinear sheet
-  would pull it. Where facets meet at a junction the sheet cannot be exactly
+  would pull it. Where facets meet at a junction the sheet can't be exactly
   unstretched (those are the d-cones of real crumpled paper), and the least
   squares spreads the difference.
 - **A heightfield.** The sheet never folds over itself, so there are no
@@ -181,7 +176,7 @@ runs the plugin's eight shaders ported to WebGL2, and
 `demo/tools/check_shaders.py` holds that GLSL character-for-character against
 `source/Shaders.cpp` (`tools/verify.sh` runs it). The sheet generator
 (`Sheet.cpp`), the control conversions and the frame sequence are a hand
-translation to JavaScript that nothing checks but a reader. One word is removed
+translation to JavaScript that nothing checks but somebody reading it. One word is removed
 from the sheet pass at load: `noperspective`, which GLSL ES 3.00 lacks and which
 changes no arithmetic when every vertex has w = 1. The audio control is absent.
 
