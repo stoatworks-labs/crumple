@@ -2,7 +2,8 @@
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author. It's **never been
-> loaded into Resolume**. Everything below is measured by an offline harness
+> loaded into Resolume on a Mac**, only into Arena on Windows, on a software
+> rasteriser. Everything below is measured by an offline harness
 > that drives the plugin's own class in a headless GL context, starting with the
 > central claim, that paper bends but doesn't stretch: across a straight ridge of
 > slope s the print must pull in by exactly ½s² of the ridge's width, and it does,
