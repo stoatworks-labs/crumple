@@ -14,6 +14,8 @@ Crumpled paper for Resolume Arena and Avenue, as an FFGL effect. The clip is
 printed on a sheet that gets crumpled, then smoothed out again, under a desk
 lamp. Roughly what happens to the running order by the second half of any show.
 
+The [project page](https://stoatworks-labs.com/software/crumple/) has the downloads and the video.
+
 ![A printed page, crumpled: facets lit and shaded by a lamp from the top left, the ruled grid and lines of text kinking at every crease](docs/hero.png)
 
 <sub>The harness's own card (a ruled grid, a headline, lines of text, a
